@@ -93,7 +93,7 @@ app.get(['/'], function (req, res) {
             });
         }
         else {
-            contents = iconv.decode(new Buffer(body), "ISO-8859-1");
+            contents = iconv.decode(new Buffer(contents), "ISO-8859-1");
             res.send(new Buffer(contents, 'binary'));
         }
     });
