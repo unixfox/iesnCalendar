@@ -76,7 +76,7 @@ app.get(['/'], function (req, res) {
         followAllRedirects: true
     };
 
-    fs.readFile("./" + filename, 'ISO-8859-1', function (err, contents) {
+    fs.readFile("./" + filename, 'utf8', function (err, contents) {
         let timeoutBeforeRefresh = 14400000;
         if (err || Math.abs(new Date(new Date().toUTCString()) - getFileUpdatedDate("./" + filename)) >= timeoutBeforeRefresh) {
             request(optionsAuthentificate).then(function () {
@@ -93,6 +93,7 @@ app.get(['/'], function (req, res) {
             });
         }
         else {
+            contents = iconv.decode(new Buffer(body), "ISO-8859-1");
             res.send(new Buffer(contents, 'binary'));
         }
     });
