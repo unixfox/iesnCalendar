@@ -1,22 +1,66 @@
 'use strict';
 
 const express = require('express');
-const request = require("request-promise");
+const app = express();
+const axios = require("axios");
 const iconv = require('iconv-lite');
 const fs = require('fs');
+const https = require('https');
+const queryString = require('query-string');
+const rp = require('request-promise');
 
-const app = express();
-
-const PHPSessionID = Array(27).fill("0123456789abcdefghijklmnopqrstuvwxyz").map(function (x) { return x[Math.floor(Math.random() * x.length)] }).join('');
-
-const getFileUpdatedDate = (path) => {
+function getFileUpdatedDate(path) {
     const stats = fs.statSync(path)
     return stats.mtime
 }
 
-app.get(['/'], function (req, res) {
+function checkFileExist(path) {
+    if (fs.existsSync(path))
+        return (true);
+    else
+        return (false);
+}
+
+async function getBearerToken() {
+    const requestSessionDataKey = await axios({
+        method: 'get',
+        url: 'https://portail.henallux.be/login',
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36'
+        },
+        httpsAgent: new https.Agent({
+            rejectUnauthorized: false
+        })
+    });
+    const requestSessionDataKeyParams = await queryString.parse(requestSessionDataKey.request.res.responseUrl);
+
+    const options = {
+        method: 'POST',
+        uri: 'https://auth.henallux.be/commonauth',
+        form: {
+            username: process.env.PORTAL_USERNAME,
+            password: process.env.PORTAL_PASSWORD,
+            sessionDataKey: requestSessionDataKeyParams["sessionDataKey"]
+        },
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36'
+        },
+        rejectUnauthorized: false,
+        followAllRedirects: true,
+        jar: true
+    };
+
+    const portalHTMLCode = await rp(options);
+    const bearerRegex = /window\['auth_user_token'] = \'(.+)\';/;
+    const bearerToken = bearerRegex.exec(portalHTMLCode)[1];
+    return bearerToken;
+}
+
+app.get(['/'], async (req, res) => {
     const year = req.query.year;
-    let group = req.query.group;
+    const group = req.query.group;
+    const orientation = (req.query.orientation || 'TI');
+    const timeoutBeforeRefresh = 14400000;
     if (group.includes(".ics"))
         group = group.replace(".ics", "");
     const nameICS = 'IE-TI-' + year + "B-" + group;
@@ -38,7 +82,7 @@ app.get(['/'], function (req, res) {
         res.status(400).send("Groupe invalide.");
         return;
     }
-    else if (Number(year) >= 3) {
+    else if (Number(year) > 3) {
         res.status(400).send("Année invalide.");
         return;
     }
@@ -52,51 +96,39 @@ app.get(['/'], function (req, res) {
         'Content-Disposition': 'inline; filename="' + filename + '"'
     });
 
-    const optionsGetICS = {
-        method: 'GET',
-        url: 'https://portail.henallux.be/horaire/ical/promotion/code_princ/' + nameICS,
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36',
-            'Cookie': 'PHPSESSID=' + PHPSessionID
-        },
-        followAllRedirects: true
-    };
+    const bearerToken = await getBearerToken();
 
-    const optionsAuthentificate = {
-        method: 'POST',
-        url: 'https://portail.henallux.be/auth/login/',
-        form: {
-            username: process.env.PORTAL_USERNAME,
-            password: process.env.PORTAL_PASSWORD
-        },
+    const instance = axios.create({
+        baseURL: 'https://portail.henallux.be/api/',
+        timeout: 1000,
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36',
-            'Cookie': 'PHPSESSID=' + PHPSessionID
-        },
-        followAllRedirects: true
-    };
-
-    fs.readFile("./" + filename, 'utf8', function (err, contents) {
-        let timeoutBeforeRefresh = 14400000;
-        if (err || Math.abs(new Date(new Date().toUTCString()) - getFileUpdatedDate("./" + filename)) >= timeoutBeforeRefresh) {
-            request(optionsAuthentificate).then(function () {
-                request(optionsGetICS).then(function (body) {
-                    body = body.replace(/Z/g, "");
-                    fs.writeFile("./" + filename, body, function (err) {
-                        if (err) {
-                            return console.log(err);
-                        }
-                        body = iconv.decode(new Buffer(body), "ISO-8859-1");
-                        res.send(new Buffer(body, 'binary'));
-                    });
-                });
-            });
-        }
-        else {
-            contents = iconv.decode(new Buffer(contents), "ISO-8859-1");
-            res.send(new Buffer(contents, 'binary'));
+            'Authorization': 'Bearer ' + bearerToken,
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36',
         }
     });
+
+    if (!checkFileExist("./" + filename) || Math.abs(new Date(new Date().toUTCString()) - getFileUpdatedDate("./" + filename)) >= timeoutBeforeRefresh) {
+        const requestOrientationCode = await (instance.get('/orientations/implantation/1'));
+        const orientationCode = await requestOrientationCode.data.data.filter(d => d.code == orientation)[0].key;
+        const requestYearCode = await (instance.get('/classes/orientation_and_implantation/' + orientationCode + '/1'));
+        const yearCode = requestYearCode.data.data.filter(d => d.annee == year + 'B')[0].key;
+        const requestGroupCode = await (instance.get('/classes/classe_and_orientation_and_implantation/' + yearCode + '/' + orientationCode + '/1'));
+        const groupCode = requestGroupCode.data.data.filter(d => d.classe == group)[0].key;
+        const requestIcalFile = await (instance.get('/plannings/promotion/[%22' + groupCode + '%22]/ical'));
+        const icalFile = iconv.decode(new Buffer(requestIcalFile.data), "ISO-8859-1");
+        fs.writeFile("./" + filename, icalFile, function (err) {
+            if (err) {
+                return console.log(err);
+            }
+            res.send(new Buffer(icalFile, 'binary'));
+        });
+    }
+    else {
+        fs.readFile("./" + filename, 'utf8', function (err, contents) {
+            contents = iconv.decode(new Buffer(contents), "ISO-8859-1");
+            res.send(new Buffer(contents, 'binary'));
+        });
+    }
 });
 
 app.all('*', function (req, res) {
