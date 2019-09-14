@@ -58,7 +58,7 @@ async function getBearerToken() {
 
 app.get(['/'], async (req, res) => {
     const year = req.query.year;
-    const group = req.query.group;
+    let group = req.query.group;
     const orientation = (req.query.orientation || 'TI');
     const timeoutBeforeRefresh = 14400000;
     if (group.includes(".ics"))
