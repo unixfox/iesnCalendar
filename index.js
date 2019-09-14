@@ -115,11 +115,13 @@ app.get(['/'], async (req, res) => {
         const requestGroupCode = await (instance.get('/classes/classe_and_orientation_and_implantation/' + yearCode + '/' + orientationCode + '/1'));
         const groupCode = requestGroupCode.data.data.filter(d => d.classe == group)[0].key;
         const requestIcalFile = await (instance.get('/plannings/promotion/[%22' + groupCode + '%22]/ical'));
-        const icalFile = iconv.decode(new Buffer(requestIcalFile.data), "ISO-8859-1");
+        let icalFile = requestIcalFile.data;
+        icalFile = icalFile.replace(/Z/g, "");
         fs.writeFile("./" + filename, icalFile, function (err) {
             if (err) {
                 return console.log(err);
             }
+            icalFile = iconv.decode(new Buffer(icalFile), "ISO-8859-1");
             res.send(new Buffer(icalFile, 'binary'));
         });
     }
