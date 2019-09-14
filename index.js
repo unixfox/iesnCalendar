@@ -60,10 +60,10 @@ app.get(['/'], async (req, res) => {
     const year = req.query.year;
     let group = req.query.group;
     const orientation = (req.query.orientation || 'TI');
-    const timeoutBeforeRefresh = 14400000;
+    const timeoutBeforeRefresh = 1800000;
     if (group.includes(".ics"))
         group = group.replace(".ics", "");
-    const nameICS = 'IE-TI-' + year + "B-" + group;
+    const nameICS = 'IE-' + orientation + '-' + year + "B-" + group;
     const filename = nameICS + ".ics";
 
     if (year == "1" &&
