@@ -65,28 +65,8 @@ app.get(['/'], async (req, res) => {
         group = group.replace(".ics", "");
     const nameICS = 'IE-' + orientation + '-' + year + "B-" + group;
     const filename = nameICS + ".ics";
-
-    if (year == "1" &&
-        !(group == "A" || group == "B" || group == "C" || group == "D" || group == "E" || group == "F" ||
-            group == "G" || group == "H" || group == "I" || group == "J" || group == "K" || group == "L")) {
-        res.status(400).send("Groupe invalide.");
-        return;
-    }
-    else if (year == "2" &&
-        !(group == "A" || group == "B" || group == "C" || group == "D")) {
-        res.status(400).send("Groupe invalide.");
-        return;
-    }
-    else if (year == "3" &&
-        !(group == "A" || group == "B" || group == "C")) {
-        res.status(400).send("Groupe invalide.");
-        return;
-    }
-    else if (Number(year) > 3) {
-        res.status(400).send("Année invalide.");
-        return;
-    }
-    else if (!year || !group) {
+    
+    if (!year || !group) {
         res.status(400).send("Paramètres invalides.");
         return;
     }
