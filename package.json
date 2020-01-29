@@ -15,7 +15,8 @@
 		"iconv-lite": "^0.4.24",
 		"query-string": "^6.8.3",
 		"request": "^2.88.0",
-		"request-promise": "^4.2.4"
+		"request-promise": "^4.2.4",
+		"retry-axios": "^1.0.1"
 	},
 	"devDependencies": {}
 }

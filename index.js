@@ -8,6 +8,8 @@ const fs = require('fs');
 const https = require('https');
 const queryString = require('query-string');
 const rp = require('request-promise');
+const rax = require('retry-axios');
+const fsPromises = require("fs").promises;
 
 function getFileUpdatedDate(path) {
     const stats = fs.statSync(path)
@@ -22,18 +24,47 @@ function checkFileExist(path) {
 }
 
 async function getBearerToken() {
-    const requestSessionDataKey = await axios({
+    console.log("login page");
+    const requestSessionDataKey = axios.create({
         method: 'get',
+        timeout: 1000,
         url: 'https://portail.henallux.be/login',
         headers: {
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36'
         },
         httpsAgent: new https.Agent({
             rejectUnauthorized: false
-        })
-    });
-    const requestSessionDataKeyParams = await queryString.parse(requestSessionDataKey.request.res.responseUrl);
+        }),
+        raxConfig: {
+            // Retry 3 times on requests that return a response (500, etc) before giving up.  Defaults to 3.
+            retry: 5,
 
+            // Retry twice on errors that don't return a response (ENOTFOUND, ETIMEDOUT, etc).
+            noResponseRetries: 9999,
+
+            // Milliseconds to delay at first.  Defaults to 100.
+            retryDelay: 100,
+
+            // HTTP methods to automatically retry.  Defaults to:
+            // ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'PUT']
+            httpMethodsToRetry: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'PUT'],
+
+            // The response status codes to retry.  Supports a double
+            // array with a list of ranges.  Defaults to:
+            // [[100, 199], [429, 429], [500, 599]]
+            statusCodesToRetry: [[100, 199], [429, 429], [500, 599]],
+
+            // You can detect when a retry is happening, and figure out how many
+            // retry attempts have been made
+            onRetryAttempt: (err) => {
+                const cfg = rax.getConfig(err);
+                console.log(`Retry attempt #${cfg.currentRetryAttempt}`);
+            }
+        }
+    });
+    const interceptorId = rax.attach(requestSessionDataKey);
+    const requestSessionDataKeyParams = await queryString.parse(requestSessionDataKey.get().request.res.responseUrl);
+    console.log("requesting id");
     const options = {
         method: 'POST',
         uri: 'https://auth.henallux.be/commonauth',
@@ -49,23 +80,37 @@ async function getBearerToken() {
         followAllRedirects: true,
         jar: true
     };
-
+    console.log("done");
     const portalHTMLCode = await rp(options);
     const bearerRegex = /window\['auth_user_token'] = \'(.+)\';/;
     const bearerToken = bearerRegex.exec(portalHTMLCode)[1];
     return bearerToken;
 }
 
+let bearerToken;
+if (checkFileExist("./credentials.json")) {
+    fsPromises.readFile("./credentials.json").then(body => {
+        bearerToken = (JSON.parse(body)).bearerToken;
+    });
+}
+else {
+    bearerToken = getBearerToken();
+}
+
 app.get(['/'], async (req, res) => {
+    console.log(bearerToken);
+    console.log("request");
+    const implantation = (req.query.implantation || 'IE')
     const year = req.query.year;
     let group = req.query.group;
     const orientation = (req.query.orientation || 'TI');
     const timeoutBeforeRefresh = 1800000;
     if (group.includes(".ics"))
         group = group.replace(".ics", "");
-    const nameICS = 'IE-' + orientation + '-' + year + "B-" + group;
+    const nameICS = implantation + '-' + orientation + '-' + year + "B-" + group;
     const filename = nameICS + ".ics";
-    
+
+
     if (!year || !group) {
         res.status(400).send("Paramètres invalides.");
         return;
@@ -76,11 +121,9 @@ app.get(['/'], async (req, res) => {
         'Content-Disposition': 'inline; filename="' + filename + '"'
     });
 
-    const bearerToken = await getBearerToken();
-
     const instance = axios.create({
         baseURL: 'https://portail.henallux.be/api/',
-        timeout: 1000,
+        timeout: 10000,
         headers: {
             'Authorization': 'Bearer ' + bearerToken,
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36',
@@ -88,11 +131,13 @@ app.get(['/'], async (req, res) => {
     });
 
     if (!checkFileExist("./" + filename) || Math.abs(new Date(new Date().toUTCString()) - getFileUpdatedDate("./" + filename)) >= timeoutBeforeRefresh) {
-        const requestOrientationCode = await (instance.get('/orientations/implantation/1'));
+        const requestImplantationCode = await (instance.get('/implantations'));
+        const implantationCode = await requestImplantationCode.data.data.filter(d => d.code == implantation)[0].key;
+        const requestOrientationCode = await (instance.get('/orientations/implantation/' + implantationCode));
         const orientationCode = await requestOrientationCode.data.data.filter(d => d.code == orientation)[0].key;
-        const requestYearCode = await (instance.get('/classes/orientation_and_implantation/' + orientationCode + '/1'));
+        const requestYearCode = await (instance.get('/classes/orientation_and_implantation/' + orientationCode + '/' + implantationCode));
         const yearCode = requestYearCode.data.data.filter(d => d.annee == year + 'B')[0].key;
-        const requestGroupCode = await (instance.get('/classes/classe_and_orientation_and_implantation/' + yearCode + '/' + orientationCode + '/1'));
+        const requestGroupCode = await (instance.get('/classes/classe_and_orientation_and_implantation/' + yearCode + '/' + orientationCode + '/' + implantationCode));
         const groupCode = requestGroupCode.data.data.filter(d => d.classe == group)[0].key;
         const requestIcalFile = await (instance.get('/plannings/promotion/[%22' + groupCode + '%22]/ical'));
         let icalFile = requestIcalFile.data;
