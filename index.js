@@ -134,7 +134,7 @@ app.get(['/'], async (req, res) => {
         const requestOrientationCode = await (instance.get('/orientations/implantation/' + implantationCode));
         const orientationCode = await requestOrientationCode.data.data.filter(d => d.code == orientation)[0].key;
         const requestYearCode = await (instance.get('/classes/orientation_and_implantation/' + orientationCode + '/' + implantationCode));
-        const yearCode = requestYearCode.data.data.filter(d => d.annee == year + 'B')[0].key;
+        const yearCode = requestYearCode.data.data.filter(d => d.annee.includes(year))[0].key;
         const requestGroupCode = await (instance.get('/classes/classe_and_orientation_and_implantation/' + yearCode + '/' + orientationCode + '/' + implantationCode));
         const groupCode = requestGroupCode.data.data.filter(d => d.classe == group)[0].key;
         const requestIcalFile = await (instance.get('/plannings/promotion/[%22' + groupCode + '%22]/ical'));
