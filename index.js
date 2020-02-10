@@ -98,17 +98,15 @@ else {
 }
 
 app.get(['/'], async (req, res) => {
-    console.log(bearerToken);
     console.log("request");
-    const implantation = (req.query.implantation || 'IE')
     const year = req.query.year;
     let group = req.query.group;
     const orientation = (req.query.orientation || 'TI');
     const timeoutBeforeRefresh = 1800000;
+    const nameICS = orientation + '-' + year + "-" + group;
+    const filename = nameICS + ".ics";
     if (group.includes(".ics"))
         group = group.replace(".ics", "");
-    const nameICS = implantation + '-' + orientation + '-' + year + "B-" + group;
-    const filename = nameICS + ".ics";
 
 
     if (!year || !group) {
@@ -131,8 +129,8 @@ app.get(['/'], async (req, res) => {
     });
 
     if (!checkFileExist("./" + filename) || Math.abs(new Date(new Date().toUTCString()) - getFileUpdatedDate("./" + filename)) >= timeoutBeforeRefresh) {
-        const requestImplantationCode = await (instance.get('/implantations'));
-        const implantationCode = await requestImplantationCode.data.data.filter(d => d.code == implantation)[0].key;
+        const requestOrientations = await (instance.get('/orientations'));
+        const implantationCode = await requestOrientations.data.data.filter(d => d.code == orientation)[0].id_implantation;
         const requestOrientationCode = await (instance.get('/orientations/implantation/' + implantationCode));
         const orientationCode = await requestOrientationCode.data.data.filter(d => d.code == orientation)[0].key;
         const requestYearCode = await (instance.get('/classes/orientation_and_implantation/' + orientationCode + '/' + implantationCode));
