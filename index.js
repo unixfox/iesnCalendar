@@ -156,10 +156,11 @@ app.get(['/'], async (req, res) => {
         }
     }
     catch(error) {
+        res.status(500);
         res.set({
             'content-type': 'text/html; charset=utf-8'
         });
-        res.send(String(error));
+        res.send("Un problème est survenu, veuillez réessayer plus tard et partager le lien ainsi que l'erreur suivante : <br>" + String(error));
     }
 });
 
