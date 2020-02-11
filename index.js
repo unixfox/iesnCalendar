@@ -109,8 +109,12 @@ app.get(['/'], async (req, res) => {
         group = group.replace(".ics", "");
 
 
-    if (!year || !group) {
-        res.status(400).send("Paramètres invalides.");
+    if (!year) {
+        res.status(400).send("L'année est invalide ou manquante.");
+        return;
+    }
+    else if (!group) {
+        res.status(400).send("Le groupe est invalide ou manquant.");
         return;
     }
 
@@ -139,7 +143,13 @@ app.get(['/'], async (req, res) => {
             const requestYearCode = await (instance.get('/classes/orientation_and_implantation/' + orientationCode + '/' + implantationCode));
             const yearCode = requestYearCode.data.data.filter(d => d.annee.includes(year))[0].key;
             const requestGroupCode = await (instance.get('/classes/classe_and_orientation_and_implantation/' + yearCode + '/' + orientationCode + '/' + implantationCode));
-            const groupCode = requestGroupCode.data.data.filter(d => d.classe == group)[0].key;
+            let groupCode;
+            if (requestGroupCode.data.count == 1) {
+                groupCode = requestGroupCode.data.data[0].key;
+            }
+            else {
+                groupCode = requestGroupCode.data.data.filter(d => d.classe == group)[0].key;
+            }
             const requestIcalFile = await (instance.get('/plannings/promotion/[%22' + groupCode + '%22]/ical'));
             let icalFile = requestIcalFile.data;
             icalFile = icalFile.replace(/Z/g, "");
