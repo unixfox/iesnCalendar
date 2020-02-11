@@ -152,7 +152,7 @@ app.get(['/'], async (req, res) => {
             }
             const requestIcalFile = await (instance.get('/plannings/promotion/[%22' + groupCode + '%22]/ical'));
             let icalFile = requestIcalFile.data;
-            icalFile = icalFile.replace(/Z/g, "");
+            icalFile = icalFile.replace(/METHOD:PUBLISH/g, "METHOD:PUBLISH\nX-WR-TIMEZONE:Europe/Brussels");
             fs.writeFile("./" + filename, icalFile, function (err) {
                 if (err) {
                     return console.log(err);
