@@ -127,32 +127,39 @@ app.get(['/'], async (req, res) => {
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36',
         }
     });
-
-    if (!checkFileExist("./" + filename) || Math.abs(new Date(new Date().toUTCString()) - getFileUpdatedDate("./" + filename)) >= timeoutBeforeRefresh) {
-        const requestOrientations = await (instance.get('/orientations'));
-        const implantationCode = await requestOrientations.data.data.filter(d => d.code == orientation)[0].id_implantation;
-        const requestOrientationCode = await (instance.get('/orientations/implantation/' + implantationCode));
-        const orientationCode = await requestOrientationCode.data.data.filter(d => d.code == orientation)[0].key;
-        const requestYearCode = await (instance.get('/classes/orientation_and_implantation/' + orientationCode + '/' + implantationCode));
-        const yearCode = requestYearCode.data.data.filter(d => d.annee.includes(year))[0].key;
-        const requestGroupCode = await (instance.get('/classes/classe_and_orientation_and_implantation/' + yearCode + '/' + orientationCode + '/' + implantationCode));
-        const groupCode = requestGroupCode.data.data.filter(d => d.classe == group)[0].key;
-        const requestIcalFile = await (instance.get('/plannings/promotion/[%22' + groupCode + '%22]/ical'));
-        let icalFile = requestIcalFile.data;
-        icalFile = icalFile.replace(/Z/g, "");
-        fs.writeFile("./" + filename, icalFile, function (err) {
-            if (err) {
-                return console.log(err);
-            }
-            icalFile = iconv.decode(new Buffer(icalFile), "ISO-8859-1");
-            res.send(new Buffer(icalFile, 'binary'));
-        });
+    try {
+        if (!checkFileExist("./" + filename) || Math.abs(new Date(new Date().toUTCString()) - getFileUpdatedDate("./" + filename)) >= timeoutBeforeRefresh) {
+            const requestOrientations = await (instance.get('/orientations'));
+            const implantationCode = await requestOrientations.data.data.filter(d => d.code == orientation)[0].id_implantation;
+            const requestOrientationCode = await (instance.get('/orientations/implantation/' + implantationCode));
+            const orientationCode = await requestOrientationCode.data.data.filter(d => d.code == orientation)[0].key;
+            const requestYearCode = await (instance.get('/classes/orientation_and_implantation/' + orientationCode + '/' + implantationCode));
+            const yearCode = requestYearCode.data.data.filter(d => d.annee.includes(year))[0].key;
+            const requestGroupCode = await (instance.get('/classes/classe_and_orientation_and_implantation/' + yearCode + '/' + orientationCode + '/' + implantationCode));
+            const groupCode = requestGroupCode.data.data.filter(d => d.classe == group)[0].key;
+            const requestIcalFile = await (instance.get('/plannings/promotion/[%22' + groupCode + '%22]/ical'));
+            let icalFile = requestIcalFile.data;
+            icalFile = icalFile.replace(/Z/g, "");
+            fs.writeFile("./" + filename, icalFile, function (err) {
+                if (err) {
+                    return console.log(err);
+                }
+                icalFile = iconv.decode(new Buffer(icalFile), "ISO-8859-1");
+                res.send(new Buffer(icalFile, 'binary'));
+            });
+        }
+        else {
+            fs.readFile("./" + filename, 'utf8', function (err, contents) {
+                contents = iconv.decode(new Buffer(contents), "ISO-8859-1");
+                res.send(new Buffer(contents, 'binary'));
+            });
+        }
     }
-    else {
-        fs.readFile("./" + filename, 'utf8', function (err, contents) {
-            contents = iconv.decode(new Buffer(contents), "ISO-8859-1");
-            res.send(new Buffer(contents, 'binary'));
+    catch(error) {
+        res.set({
+            'content-type': 'text/html; charset=utf-8'
         });
+        res.send(String(error));
     }
 });
 
