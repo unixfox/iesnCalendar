@@ -125,6 +125,9 @@ app.get(['/'], async (req, res) => {
         headers: {
             'Authorization': 'Bearer ' + bearerToken,
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36',
+        },
+        validateStatus: function (status) {
+            return status < 500;
         }
     });
     try {
@@ -155,7 +158,7 @@ app.get(['/'], async (req, res) => {
             });
         }
     }
-    catch(error) {
+    catch (error) {
         res.status(500);
         res.set({
             'content-type': 'text/html; charset=utf-8'
