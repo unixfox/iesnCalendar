@@ -10,6 +10,7 @@ const queryString = require('query-string');
 const rp = require('request-promise');
 const rax = require('retry-axios');
 const fsPromises = require("fs").promises;
+const moment = require('moment');
 
 function getFileUpdatedDate(path) {
     const stats = fs.statSync(path)
@@ -152,14 +153,25 @@ app.get(['/'], async (req, res) => {
             }
             const requestIcalFile = await (instance.get('/plannings/promotion/[%22' + groupCode + '%22]/ical'));
             let icalFile = requestIcalFile.data;
-            icalFile = icalFile.replace(/METHOD:PUBLISH/g, "METHOD:PUBLISH\nX-WR-TIMEZONE:Europe/Brussels");
-            fs.writeFile("./" + filename, icalFile, function (err) {
-                if (err) {
-                    return console.log(err);
-                }
-                icalFile = iconv.decode(new Buffer(icalFile), "ISO-8859-1");
-                res.send(new Buffer(icalFile, 'binary'));
-            });
+            const getEndDate = icalFile.match(/X-CALEND:(?<date>\d{4}\d{2}\d{2}T\d{2}\d{2}\d{2}Z)/).groups.date;
+            const parsedEndDate = moment(getEndDate).format("X");
+            const timestampNow = moment().format("X");
+            if (parsedEndDate > timestampNow) {
+                icalFile = icalFile.replace(/METHOD:PUBLISH/g, "METHOD:PUBLISH\nX-WR-TIMEZONE:Europe/Brussels");
+                fs.writeFile("./" + filename, icalFile, function (err) {
+                    if (err) {
+                        return console.log(err);
+                    }
+                    icalFile = iconv.decode(new Buffer(icalFile), "ISO-8859-1");
+                    res.send(new Buffer(icalFile, 'binary'));
+                });
+            }
+            else {
+                fs.readFile("./" + filename, 'utf8', function (err, contents) {
+                    contents = iconv.decode(new Buffer(contents), "ISO-8859-1");
+                    res.send(new Buffer(contents, 'binary'));
+                });
+            }
         }
         else {
             fs.readFile("./" + filename, 'utf8', function (err, contents) {
