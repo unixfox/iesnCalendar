@@ -102,7 +102,7 @@ app.get(['/'], async (req, res) => {
     console.log("request");
     const year = req.query.year;
     let group = req.query.group;
-    const orientation = (req.query.orientation || 'TI');
+    const orientation = (req.query.orientation.toUpperCase() || 'TI');
     const timeoutBeforeRefresh = 1800000;
     const nameICS = orientation + '-' + year + "-" + group;
     const filename = nameICS + ".ics";
