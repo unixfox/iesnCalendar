@@ -101,7 +101,7 @@ else {
 app.get(['/'], async (req, res) => {
     console.log("request");
     const year = req.query.year;
-    let group = req.query.group;
+    let group = req.query.group.toUpperCase();
     const orientation = (req.query.orientation.toUpperCase() || 'TI');
     const timeoutBeforeRefresh = 1800000;
     const nameICS = orientation + '-' + year + "-" + group;
