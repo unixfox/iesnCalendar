@@ -110,6 +110,10 @@ if (!fs.existsSync(ICSDirectory)) {
 }
 
 app.get(['/'], async (req, res) => {
+    if (req.url === "/") {
+        res.status(400).send("Merci de spécifier des paramètres.");
+        return;
+    }
     console.log("request");
     const year = req.query.year;
     let group = req.query.group.toUpperCase();
