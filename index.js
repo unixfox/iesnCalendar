@@ -94,8 +94,19 @@ if (checkFileExist("./credentials.json")) {
         bearerToken = (JSON.parse(body)).bearerToken;
     });
 }
+else if (process.env.AUTH_USER_TOKEN) {
+    bearerToken = process.env.AUTH_USER_TOKEN;
+}
 else {
     bearerToken = getBearerToken();
+}
+
+let ICSDirectory = "./data";
+if (process.env.ICS_DIRECTORY)
+    ICSDirectory = process.env.ICS_DIRECTORY;
+
+if (!fs.existsSync(ICSDirectory)) {
+    fs.mkdirSync(ICSDirectory);
 }
 
 app.get(['/'], async (req, res) => {
@@ -136,7 +147,7 @@ app.get(['/'], async (req, res) => {
         }
     });
     try {
-        if (!checkFileExist("./" + filename) || Math.abs(new Date(new Date().toUTCString()) - getFileUpdatedDate("./" + filename)) >= timeoutBeforeRefresh) {
+        if (!checkFileExist(ICSDirectory + "/" + filename) || Math.abs(new Date(new Date().toUTCString()) - getFileUpdatedDate("./" + filename)) >= timeoutBeforeRefresh) {
             const requestOrientations = await (instance.get('/orientations'));
             const implantationCode = await requestOrientations.data.data.filter(d => d.code == orientation)[0].id_implantation;
             const requestOrientationCode = await (instance.get('/orientations/implantation/' + implantationCode));
@@ -158,7 +169,7 @@ app.get(['/'], async (req, res) => {
             const timestampNow = moment().format("X");
             if (parsedEndDate > timestampNow) {
                 icalFile = icalFile.replace(/METHOD:PUBLISH/g, "METHOD:PUBLISH\nX-WR-TIMEZONE:Europe/Brussels");
-                fs.writeFile("./" + filename, icalFile, function (err) {
+                fs.writeFile(ICSDirectory + "/" + filename, icalFile, function (err) {
                     if (err) {
                         return console.log(err);
                     }
@@ -167,14 +178,14 @@ app.get(['/'], async (req, res) => {
                 });
             }
             else {
-                fs.readFile("./" + filename, 'utf8', function (err, contents) {
+                fs.readFile(ICSDirectory + "/" + filename, 'utf8', function (err, contents) {
                     contents = iconv.decode(new Buffer(contents), "ISO-8859-1");
                     res.send(new Buffer(contents, 'binary'));
                 });
             }
         }
         else {
-            fs.readFile("./" + filename, 'utf8', function (err, contents) {
+            fs.readFile(ICSDirectory + "/" + filename, 'utf8', function (err, contents) {
                 contents = iconv.decode(new Buffer(contents), "ISO-8859-1");
                 res.send(new Buffer(contents, 'binary'));
             });
