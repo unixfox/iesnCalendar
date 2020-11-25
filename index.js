@@ -151,7 +151,7 @@ app.get(['/'], async (req, res) => {
         }
     });
     try {
-        if (!checkFileExist(ICSDirectory + "/" + filename) || Math.abs(new Date(new Date().toUTCString()) - getFileUpdatedDate("./" + filename)) >= timeoutBeforeRefresh) {
+        if (!checkFileExist(ICSDirectory + "/" + filename) || Math.abs(new Date(new Date().toUTCString()) - getFileUpdatedDate(ICSDirectory + "/" + filename)) >= timeoutBeforeRefresh) {
             const requestOrientations = await (instance.get('/orientations'));
             const implantationCode = await requestOrientations.data.data.filter(d => d.code == orientation)[0].id_implantation;
             const requestOrientationCode = await (instance.get('/orientations/implantation/' + implantationCode));
