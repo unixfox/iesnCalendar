@@ -141,7 +141,7 @@ app.get(['/'], async (req, res) => {
 
     const instance = axios.create({
         baseURL: 'https://portail.henallux.be/api/',
-        timeout: 10000,
+        timeout: 30000,
         headers: {
             'Authorization': 'Bearer ' + bearerToken,
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36',
